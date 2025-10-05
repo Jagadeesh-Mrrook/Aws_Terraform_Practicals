@@ -1,147 +1,69 @@
-AWS + Terraform Practical Learning Plan
+## Realistic AWS + Terraform Daily Practical Plan (4 hours/day)
 
-# Overview
+### Phase 1: Core Compute + Networking (Days 1–4)
 
-This plan is designed to teach AWS and Terraform together in a structured, practical way. Each phase includes step-by-step console instructions, Terraform implementation, outputs, testing, and mini challenges.
+**Goal:** Deploy a production-ready web application environment
 
----
+| Day   | Services                                 | Notes                                                                                                                                                         |
+| ----- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Day 1 | VPC                                      | Subnets, IGW, NAT Gateway, NACLs, Security Groups, secondary CIDRs, DNS, DHCP options, flow logs, VPC peering, VPC endpoints, tags, hybrid networking options |
+| Day 2 | Subnets + Route Tables + Security Groups | Public/private subnets, route table associations, IGW/NAT routes, SG rules (SSH, HTTP, HTTPS), NACLs, connectivity testing                                    |
+| Day 3 | EC2 Instances + Launch Templates + AMI   | Key pairs, security groups, IAM roles, monitoring, Elastic IPs, tagging, user data scripts, basic CloudWatch metrics                                          |
+| Day 4 | ALB + Auto Scaling Group (ASG)           | Target groups, listeners, path-based routing, attach EC2 instances, scaling policies, min/max instances, monitoring via CloudWatch                            |
 
-## Phase 1: Core Compute + Networking (Day 1–3)
+### Phase 2: Storage + Identity (Day 5)
 
-**Services:** VPC, Subnets, Security Groups, EC2, ALB, Auto Scaling Group
-**Goal:** Deploy a basic web application environment.
+**Goal:** Secure storage and access management
 
-### Sub-Phases:
+| Day   | Services                         | Notes                                                                                                                                                                                                                |
+| ----- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Day 5 | S3 + IAM + KMS + Secrets Manager | S3 buckets (all storage classes, versioning, lifecycle, replication, cross-account), IAM users/roles/policies, KMS keys (rotation, re-encrypt), Secrets Manager for credentials, CloudTrail integration for tracking |
 
-1. **VPC**
+### Phase 3: Monitoring + Logging (Day 6)
 
-   * Concept explanation
-   * AWS console creation
-   * Terraform creation & apply
-   * Testing connectivity
-   * Mini challenge (e.g., add a second CIDR block)
+**Goal:** Observability & user/API activity tracking
 
-2. **Subnets**
+| Day   | Services                      | Notes                                                                                                                                                                        |
+| ----- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Day 6 | CloudWatch + CloudTrail + SNS | CloudTrail (management & data events, S3 object-level, API activity, cross-account), CloudWatch metrics/alarms/logs, SNS notifications on alerts/events, integration testing |
 
-   * Public and private subnets
-   * Route tables & IGW
-   * Terraform creation
-   * Testing (ping, SSH if applicable)
-   * Mini challenge (e.g., create additional subnet in a different AZ)
+### Phase 4: Databases + Backup (Day 7)
 
-3. **Security Groups**
+**Goal:** Managed databases securely with backups
 
-   * EC2 & ALB specific
-   * Rules: SSH/HTTP/HTTPS
-   * Terraform creation
-   * Testing connectivity
-   * Mini challenge (restrict SSH to a specific IP)
+| Day   | Services                   | Notes                                                                                                                                 |
+| ----- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Day 7 | RDS + DynamoDB + Snapshots | RDS (multi-AZ, backups, monitoring), DynamoDB (tables, streams, TTL), EBS/RDS snapshots, connectivity from EC2, Terraform integration |
 
-4. **EC2 Instances**
+### Phase 5: Serverless + Integration (Days 8–9)
 
-   * Launch using Launch Template
-   * Terraform creation
-   * Testing SSH & outputs (Public IP, private IP)
-   * Mini challenge (deploy multiple EC2s)
+**Goal:** Serverless workflows & event-driven architecture
 
-5. **ALB**
+| Day   | Services                         | Notes                                                                                                                                                         |
+| ----- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Day 8 | Lambda + API Gateway + SQS + SNS | Lambda functions (roles, env variables, versions, monitoring), API Gateway endpoints (HTTP/REST), SQS/SNS triggers, CloudWatch logs & alarms, mini-challenges |
+| Day 9 | Optional Advanced Serverless     | Step Functions, multiple triggers, error handling, concurrency limits                                                                                         |
 
-   * Target groups & listeners
-   * Attach EC2 instances
-   * Terraform creation
-   * Testing HTTP traffic via ALB DNS
-   * Mini challenge (path-based routing)
+### Phase 6: Security + Management (Day 10)
 
-6. **Auto Scaling Group**
+**Goal:** Apply security & management policies
 
-   * Launch template
-   * Terraform creation
-   * Testing scaling up/down
-   * Mini challenge (change scaling policies, min/max instances)
+| Day    | Services                            | Notes                                                                                                                                                                        |
+| ------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Day 10 | WAF + AWS Config + SSM + AWS Shield | Attach WAF to ALB, CloudWatch monitoring of rules, AWS Config rules & drift detection, SSM commands & patching, AWS Shield for DDoS protection, testing traffic restrictions |
 
----
+### Summary
 
-## Phase 2: Storage + Identity (Day 4)
+* Phase 1: 4 days
+* Phase 2: 1 day
+* Phase 3: 1 day
+* Phase 4: 1 day
+* Phase 5: 2 days
+* Phase 6: 1 day
+  **Total:** 10 days (4 hours/day)
 
-**Services:** S3, IAM, KMS
-**Goal:** Secure storage and access management.
-
-* S3: Public/private buckets, versioning, Terraform creation, testing, mini challenge (cross-account access)
-* IAM: Users, roles, policies, Terraform creation, testing, mini challenge (dynamic policy attachment)
-* KMS: S3 bucket encryption, Terraform creation, testing, mini challenge (rotate keys, re-encrypt bucket)
-
----
-
-## Phase 3: Monitoring + Logging (Day 5)
-
-**Services:** CloudWatch, CloudTrail, SNS
-**Goal:** Observability and alerts for infrastructure.
-
-* CloudWatch alarms, CloudTrail logs, SNS topic creation
-* Terraform deployment, testing, mini challenges (e.g., trigger SNS on CPU > 70%)
-
----
-
-## Phase 4: Databases + Backup (Day 6)
-
-**Services:** RDS, DynamoDB, Snapshots
-**Goal:** Deploy managed databases securely with backups.
-
-* RDS instance creation, DynamoDB table, Terraform deployment
-* Testing connectivity & backups
-* Mini challenge: Connect RDS to EC2 from Phase 1
-
----
-
-## Phase 5: Serverless + Integration (Day 7)
-
-**Services:** Lambda, API Gateway, SQS/SNS
-**Goal:** Deploy serverless workflows and event-driven architecture.
-
-* Lambda functions, API Gateway, SQS/SNS triggers
-* Terraform deployment, testing
-* Mini challenge: Trigger Lambda via multiple sources and verify CloudWatch logs
-
----
-
-## Phase 6: Security + Management (Day 8)
-
-**Services:** WAF, AWS Config, SSM
-**Goal:** Apply security and management policies.
-
-* Attach WAF to ALB, AWS Config rules, SSM command execution
-* Terraform deployment, testing
-* Mini challenge: Attach WAF to ALB from Phase 1 and test traffic rules
-
----
-
-## Workflow During Each Day
-
-1. Concept explanation (purpose, use cases, best practices)
-2. AWS Console creation (step-by-step, mandatory fields highlighted)
-3. Terraform implementation (resource block, mandatory/optional fields, plan/apply, testing outputs)
-4. Mini challenges / variations (interview-style or extra tasks)
-5. Notes generation (modular, AWS & Terraform, includes testing steps, pitfalls, best practices)
-
----
-
-## Notes Structure
-
-* Separate sections for AWS and Terraform for each resource
-* Headings: Purpose, Mandatory Parameters, Optional Parameters, Pitfalls, Best Practices, Testing Steps, Mini Challenges
-* Designed for future additions without breaking existing notes
-
----
-
-## Optional Advanced Extensions
-
-* VPC peering / Transit Gateway
-* RDS multi-AZ / read replicas
-* ALB advanced routing (host-based, weighted targets)
-* Terraform modules for reusability
-* CI/CD integration with Terraform
+**Workflow Note:** You will provide the daily service/concept list at the start of the chat. Each day will follow the zero-missed-concepts practical workflow, including AWS console creation, Terraform implementation, testing, mini-challenges, and modular notes generation.
 
 ---
 ---
 ---
-
