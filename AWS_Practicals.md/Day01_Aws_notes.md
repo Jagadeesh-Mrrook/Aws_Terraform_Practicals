@@ -91,4 +91,82 @@ A Virtual Private Cloud (VPC) is a logically isolated virtual network in AWS whe
 ---
 ---
 
+# 🌐 AWS Notes — Subnets
+
+## Definition / Purpose
+
+A **subnet** is a range of IP addresses within a VPC that resides in a single **Availability Zone (AZ)**.
+
+* Public subnets: Internet-facing, route to **IGW**.
+* Private subnets: Internal, route to **NAT Gateway** for outbound internet.
+
+## Key Sub-Concepts
+
+* **CIDR Block:** Must be a subset of the VPC CIDR. Example:
+
+  * VPC = `10.0.0.0/16`
+  * Subnet = `10.0.1.0/24` (256 IPs)
+* **AZ-specific:** Each subnet exists in a single AZ.
+* **Subnet Types:**
+
+  * Public → route to IGW
+  * Private → route via NAT
+* **High Availability:** Create subnets in multiple AZs.
+
+## Manual Creation Steps
+
+1. Go to **AWS Console → VPC → Subnets → Create Subnet**.
+2. Select **VPC**.
+3. Enter **Name tag** (e.g., `payments-public-1`).
+4. Choose **Availability Zone** (AZ).
+5. Enter **IPv4 CIDR block** (subset of VPC).
+6. Click **Create Subnet**.
+7. Repeat for multiple subnets in different AZs and types (public/private).
+
+## Tips / Tricky Points / Gotchas
+
+* CIDR **must not overlap** within the VPC.
+* Public subnets require **route table pointing to IGW** to be internet-facing.
+* Private subnets will need **NAT Gateway** for outbound internet.
+* Each subnet is **AZ-specific**; plan multiple AZs for HA.
+* Maximum subnets per VPC: **200 by default**.
+
+## Linking with Other Services
+
+* EC2, RDS, Lambda instances use the subnet’s CIDR, routing, and SG/NACL rules.
+* NAT Gateway must reside in **public subnet** for private subnet outbound connectivity.
+* Route tables define traffic flow for public/private subnets.
+
+## Tagging / Naming Best Practices
+
+* Use consistent tags:
+
+  * `Name` → e.g., `payments-public-1`
+  * `Environment` → `dev`, `prod`
+  * `Project` → e.g., `payments`
+* Helps in management, cost allocation, and automation.
+
+## High Availability Considerations
+
+* Create **at least one public + one private subnet per AZ**.
+* Multi-AZ subnets allow EC2/RDS failover.
+* NAT Gateway should ideally be **one per AZ** to avoid single point of failure.
+
+## Verification Steps
+
+* Console → VPC → Subnets → check: CIDR, AZ, and tags.
+* Launch EC2 in public subnet → verify public IP, ping external IP.
+* Launch EC2 in private subnet → verify no public IP, test NAT access later.
+* Optional: ping between instances in the same VPC.
+
+## Interview-Focused Points
+
+* Difference between **public vs private subnet**.
+* Why **NAT Gateway** is needed for private subnet.
+* How subnet CIDR planning affects **scalability** and **future peering**.
+* Subnets are **AZ-specific** → explain importance for **HA**.
+
+---
+---
+
 
