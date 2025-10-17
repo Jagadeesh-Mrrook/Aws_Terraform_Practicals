@@ -137,4 +137,135 @@ terraform apply -auto-approve
 ---
 ---
 
+# 🌐 Terraform Notes — Subnets
+
+## Overview
+
+This section explains how to create **AWS subnets using Terraform** in a VPC with multi-AZ support.
+
+---
+
+## Terraform Resource
+
+**Resource Type:** `aws_subnet`
+
+### Purpose / Mapping
+
+* Each subnet exists in a single **Availability Zone (AZ)**.
+* Public subnets: route to **Internet Gateway (IGW)**.
+* Private subnets: route via **NAT Gateway**.
+* Used for EC2, RDS, Load Balancers, and other AWS resources.
+
+---
+
+## Mandatory Fields
+
+| Field                     | Description                                  |
+| ------------------------- | -------------------------------------------- |
+| `vpc_id`                  | ID of the VPC where subnet belongs           |
+| `cidr_block`              | Subnet IP range (must be subset of VPC CIDR) |
+| `availability_zone`       | Optional but recommended for multi-AZ setup  |
+| `map_public_ip_on_launch` | True for public subnets, false for private   |
+| `tags`                    | Recommended: Name + Environment              |
+
+---
+
+## Optional Fields
+
+| Field                             | Description                 |
+| --------------------------------- | --------------------------- |
+| `ipv6_cidr_block`                 | For IPv6-enabled subnets    |
+| `assign_ipv6_address_on_creation` | Auto-assign IPv6 addresses  |
+| `outpost_arn`                     | For AWS Outposts deployment |
+
+---
+
+## Variables (Recommended)
+
+* Use variables to avoid hardcoding CIDRs and AZs.
+* Example variables:
+
+```hcl
+variable "public_subnet_1_cidr" { default = "10.0.1.0/24" }
+variable "public_subnet_2_cidr" { default = "10.0.2.0/24" }
+variable "private_subnet_1_cidr" { default = "10.0.3.0/24" }
+variable "private_subnet_2_cidr" { default = "10.0.4.0/24" }
+variable "az1" { default = "ap-south-1a" }
+variable "az2" { default = "ap-south-1b" }
+```
+
+---
+
+## Linking / Dependencies
+
+* Subnets depend on **VPC (`aws_vpc.main`)**.
+* Referenced by:
+
+  * Route Tables (`aws_route_table_association`)
+  * NAT Gateways (for private subnets)
+  * EC2 instances, Load Balancers, RDS
+
+---
+
+## Terraform Outputs
+
+* **Public Subnets:**
+
+```hcl
+output "public_subnet_ids" {
+  value = [aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id]
+}
+```
+
+* **Private Subnets:**
+
+```hcl
+output "private_subnet_ids" {
+  value = [aws_subnet.private_subnet_1.id, aws_subnet.private_subnet_2.id]
+}
+```
+
+* Use square brackets `[ ]` when outputting **multiple values**.
+* Reference Terraform resource name, **not AWS tag Name**.
+
+---
+
+## Verification Steps
+
+1. `terraform plan` → verify all 4 subnet resources.
+2. `terraform apply -auto-approve` → creates subnets.
+3. AWS Console → VPC → Subnets → confirm:
+
+   * Correct CIDR ranges
+   * Correct AZs
+   * Public subnets have Auto-assign public IP enabled
+   * Private subnets have it disabled
+
+---
+
+## Tricky Points / Gotchas
+
+* CIDR overlap will cause creation failure.
+* Forgetting `map_public_ip_on_launch` for public subnets → EC2 won’t get public IP.
+* Terraform references **resource name**, not the AWS Name tag.
+* Multiple subnets in multiple AZs are required for **high availability**.
+* Square brackets `[ ]` for outputs needed when returning multiple values.
+
+---
+
+## Interview Tips
+
+* Public vs Private subnets explanation.
+* Purpose of `map_public_ip_on_launch`.
+* Why subnets are AZ-specific.
+* How Terraform links subnets with VPC, route tables, and NAT Gateway.
+* Parameterizing CIDRs and AZs using variables is a best practice for reusable code.
+
+---
+
+✅ Next Concept: **Route Tables + Internet Gateway (AWS explanation)**
+
+---
+---
+
 
