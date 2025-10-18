@@ -169,4 +169,127 @@ A **subnet** is a range of IP addresses within a VPC that resides in a single **
 ---
 ---
 
+# 🌐 AWS Notes — Subnets, IGW, Route Tables, and Subnet Associations
+
+## **1️⃣ Internet Gateway (IGW)**
+
+**Definition / Purpose**
+
+* Horizontally scaled, AWS-managed gateway for **public subnet internet access**.
+* Only **one IGW per VPC** is allowed.
+* Provides outbound path to the internet and allows return traffic for stateful connections.
+
+**Manual Console Creation Steps**
+
+1. AWS Console → VPC → Internet Gateways → Create Internet Gateway
+2. Provide a **Name** → Create
+3. Select IGW → Actions → Attach to VPC → Choose your VPC → Attach
+
+**Tricky Points / Gotchas**
+
+* Only one IGW per VPC.
+* Cannot delete while attached to a VPC.
+* IGW does **not control inbound filtering** — Security Groups/NACLs do.
+
+**Verification Steps**
+
+* Check IGW state = attached
+* Launch EC2 in a public subnet → test internet access (`curl http://ifconfig.me`)
+
+**Key Concept**
+
+* IGW is mostly for **outbound traffic**, but return traffic comes back automatically for allowed connections.
+
+---
+
+## **2️⃣ Route Tables (RT)**
+
+**Definition / Purpose**
+
+* Controls **how traffic flows** from subnets.
+* Every VPC has **one default RT** with a `local` route for intra-VPC communication.
+* Custom RTs separate **public/private subnet traffic** and define internet access paths.
+
+**Manual Console Creation Steps**
+
+1. VPC → Route Tables → Create Route Table → Name + VPC → Create
+2. Add routes:
+
+   * Public RT: Destination = `0.0.0.0/0` → Target = IGW
+   * Private RT: Destination = `0.0.0.0/0` → Target = NAT Gateway (later)
+3. Subnet Associations → Edit Subnet Associations → select subnets → Save
+
+**Tricky Points / Gotchas**
+
+* Default RT cannot be deleted.
+* Subnet can only be associated with **one RT at a time**.
+* Associating subnet with custom RT **removes it from default RT**.
+* `Local` route cannot be removed — ensures **intra-VPC traffic**.
+
+**Verification Steps**
+
+* Check subnet associations in Route Table console
+* Launch EC2 instances → test connectivity:
+
+  * Public → Internet (via IGW)
+  * Private → No internet until NAT is added
+  * Both → Can talk to each other internally (local route)
+
+**Interview Points**
+
+* Default RT vs Custom RT behavior
+* Local route allows **intra-VPC communication**
+* A subnet can have only **one route table association**
+
+---
+
+## **3️⃣ Subnet Associations**
+
+**Definition / Purpose**
+
+* Assigns a **subnet to a specific RT**, controlling its traffic paths.
+
+**Manual Console Steps**
+
+1. Route Table → Subnet Associations → Edit Subnet Associations
+2. Select subnets → Save
+
+**Tricky Points / Gotchas**
+
+* A subnet can only be associated with **one RT** at a time.
+* Subnet associated with custom RT **stops using default RT**.
+* Default RT still exists in the VPC but may be **unused**.
+
+**Verification Steps**
+
+* Check that subnets are listed under the correct RT
+* Test connectivity to confirm outbound/inbound behavior per RT
+
+**Key Concept**
+
+* Route tables + subnet associations control the **path of traffic**, but actual **filtering is done via SGs/NACLs**.
+
+---
+
+## **4️⃣ Outbound vs Inbound Clarification**
+
+* **Outbound traffic:** controlled by **route tables + IGW/NAT**
+* **Inbound traffic:** controlled by **Security Groups (stateful) and NACLs (stateless)**
+* Subnets and IGW only provide **the path**; they do not filter traffic
+
+**Example:**
+
+* Public subnet instance → IGW → Internet (allowed by RT)
+* Return traffic comes back automatically (stateful)
+* Security Groups/NACLs decide if traffic is actually allowed to reach the instance
+
+**Key Interview Points**
+
+* Default RT cannot be deleted, but subnets can move to custom RTs
+* Intra-VPC communication is allowed by `local` route unless blocked by SG/NACL
+* IGW provides a pathway for outbound traffic; inbound filtering requires SG/NACL configuration
+
+---
+---
+
 

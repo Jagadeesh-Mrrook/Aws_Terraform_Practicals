@@ -268,4 +268,133 @@ output "private_subnet_ids" {
 ---
 ---
 
+    # 🌩️ Terraform Notes — AWS Internet Gateway, Route Tables & Subnets
+
+## 🧭 Overview
+
+This section explains Terraform resources for Internet Gateway, Route Tables, and Subnets, focusing on route associations, locals usage, and best practices from our learning session.
+
+---
+
+## 1️⃣ Internet Gateway
+
+**Resource:** `aws_internet_gateway`
+
+### Purpose / Mapping to AWS
+
+* Enables outbound internet access for public subnets.
+* AWS manages scaling and redundancy automatically.
+
+### Example Code
+
+```hcl
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "my-igw"
+  }
+}
+```
+
+### Verification
+
+* EC2 in public subnet can access internet after attaching IGW and adding route.
+
+---
+
+## 2️⃣ Route Table
+
+**Resource:** `aws_route_table`
+
+### Purpose / Mapping to AWS
+
+* Controls routing for subnets (public/private).
+* Default route to local VPC CIDR is always present automatically.
+
+### Mandatory Fields
+
+* `vpc_id`
+* `tags`
+
+### Optional Fields / Routes
+
+* Can define inline `route` blocks, e.g., IGW, NAT, peering.
+* Alternatively, use standalone `aws_route` resource for modularity.
+
+### Discussion Highlights
+
+* Local route (VPC CIDR) is automatically added; no need to specify.
+* For external routes, define only additional routes (IGW/NAT/Peering).
+* Using `locals.tf` is recommended for storing resource IDs for reuse (e.g., `local.public_rt_id = aws_route_table.public.id`).
+
+### Example Code (Inline Route)
+
+```hcl
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "public-rt"
+  }
+}
+```
+
+---
+
+## 3️⃣ Route Table Association
+
+**Resource:** `aws_route_table_association`
+
+### Purpose / Mapping to AWS
+
+* Associates subnets with a route table.
+* Terraform automatically handles dependency if referencing `aws_subnet` and `aws_route_table` directly.
+
+### Example Code Using Locals
+
+```hcl
+locals {
+  public_rt_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "public1" {
+  subnet_id      = aws_subnet.public1.id
+  route_table_id = local.public_rt_id
+}
+```
+
+### Discussion Highlights
+
+* Cannot assign resource ID to `variables.tf`; must reference directly or use `locals`.
+* This ensures **Terraform builds the dependency graph correctly**.
+
+### Verification
+
+* Check subnet route table in AWS console; ensure public subnet points to public RT with IGW route.
+* Test EC2 connectivity for outbound internet.
+
+---
+
+## 💡 Key Discussion Points from Learning
+
+* Default RT always contains local route to VPC CIDR.
+* Custom RTs override subnet association; subnet uses the new RT instead of default.
+* IGW is horizontally scaled and redundant internally by AWS.
+* Terraform best practice: use **variables** for static input (CIDRs, AZs) and **locals** for resource references (IDs).
+* Subnet, RT, and IGW references are **direct or via locals**, never via variables.tf for dynamic values.
+
+---
+
+*End of Terraform Notes — Internet Gateway, Route Tables & Subnets.*
+
+---
+---
+
+
 
