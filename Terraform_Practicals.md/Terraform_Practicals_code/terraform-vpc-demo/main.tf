@@ -74,3 +74,57 @@ resource "aws_subnet" "tf_private_subnet2" {
   }
   
 }
+
+resource "aws_internet_gateway" "console-igw" {
+  vpc_id = aws_vpc.first_vpc.id
+
+  tags = {
+    Name = "terraform-igw"
+  }
+}
+
+resource "aws_route_table" "terraform-public-rt" {
+  vpc_id = aws_vpc.first_vpc.id
+ tags = {
+    Name = "terraform-public-rt"
+  }
+}
+
+resource "aws_route" "Public-Internet" {
+  route_table_id = aws_route_table.terraform-public-rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id = aws_internet_gateway.console-igw.id 
+}
+
+resource "aws_route_table_association" "rta-public-subnet1" {
+  subnet_id      = aws_subnet.tf_public_subnet1.id
+  route_table_id = aws_route_table.terraform-public-rt.id
+}
+
+resource "aws_route_table_association" "rta-public-subnet2" {
+  subnet_id      = aws_subnet.tf_public_subnet2.id
+  route_table_id = aws_route_table.terraform-public-rt.id
+}
+
+resource "aws_route_table" "terraform-private-rt" {
+  vpc_id = aws_vpc.first_vpc.id
+ tags = {
+    Name = "terraform-private-rt"
+  }
+}
+
+/*resource "aws_route" "Public-Internet" {
+  route_table_id = aws_route_table.terraform-public-rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id = aws_internet_gateway.console-igw.id 
+}*/
+
+resource "aws_route_table_association" "rta-private-subnet1" {
+  subnet_id      = aws_subnet.tf_private_subnet1.id
+  route_table_id = aws_route_table.terraform-private-rt.id
+}
+
+resource "aws_route_table_association" "rta-private-subnet2" {
+  subnet_id      = aws_subnet.tf_private_subnet2.id
+  route_table_id = aws_route_table.terraform-private-rt.id
+}
