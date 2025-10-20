@@ -292,4 +292,134 @@ A **subnet** is a range of IP addresses within a VPC that resides in a single **
 ---
 ---
 
+# 🌩️ AWS Notes — NAT Gateway & Private Subnet Routing
+
+## **Definition / Purpose**
+
+* NAT Gateway allows **instances in private subnets** to access the internet for outbound traffic only.
+* Private instances remain **inaccessible from the internet**.
+* Managed by AWS: redundant and horizontally scaled **within an AZ**.
+
+---
+
+## **Key Sub-Concepts**
+
+1. **Elastic IP (EIP):** NAT Gateway requires a public IP to route traffic.
+2. **Public Subnet:** NAT Gateway must reside in a subnet with **IGW access**.
+3. **Route Table Update:** Private subnets route `0.0.0.0/0` through NAT Gateway.
+
+---
+
+## **Manual Console Creation Steps**
+
+1. **Allocate an Elastic IP:** VPC → Elastic IPs → Allocate new EIP.
+2. **Create NAT Gateway:** VPC → NAT Gateways → Create NAT Gateway.
+
+   * Subnet: Choose a **public subnet**.
+   * Elastic IP: Select the allocated EIP.
+3. **Update Private Subnet Route Table:**
+
+   * Route Tables → Select private RT → Edit routes → Add route:
+
+     * Destination: `0.0.0.0/0`
+     * Target: NAT Gateway ID
+4. **Verify creation:** NAT Gateway shows **Available** state.
+
+---
+
+## **Tips / Tricky Points / Gotchas**
+
+* **One NAT Gateway per AZ** is required for HA; each private subnet must point to the NAT in its AZ.
+* **Elastic IP cost:** Billed per hour + data processed.
+* **Private subnet must not have IGW route**; otherwise, NAT Gateway is bypassed.
+* NAT Gateway handles **outbound traffic only**; inbound connections from internet are blocked.
+* **Alternative for Multi-AZ HA:** Older setups used **NAT Instances** in each AZ.
+
+  * These required manual management (scaling, failover, patching).
+  * Not recommended by most organizations today; NAT Gateway is preferred.
+
+---
+
+## **Verification Steps**
+
+* Launch an EC2 instance in a **private subnet**.
+* Test outbound internet access: `ping 8.8.8.8` or `curl http://ifconfig.me`.
+* Confirm private instance uses NAT Gateway’s EIP for outbound traffic.
+* Ensure public subnet still has direct internet access via IGW.
+
+---
+
+## **High Availability Considerations**
+
+* Multi-AZ setup: Create one NAT Gateway in **each AZ**.
+* Update route tables in each private subnet to point to the NAT Gateway in its own AZ.
+* Using NAT Instances for multi-AZ HA is possible but **not recommended** due to management overhead.
+
+---
+
+## **Interview-Focused Points**
+
+* Difference between **IGW and NAT Gateway**.
+* Why NAT Gateway resides in **public subnet**.
+* Multi-AZ NAT Gateway deployment for HA.
+* Cost comparison: NAT Gateway vs NAT Instance (legacy approach).
+
+---
+---
+
+🌩️ AWS Notes — Security Groups (SG)
+
+**Definition / Purpose**
+
+* Security Groups act as virtual firewalls for resources in a VPC.
+* Control inbound and outbound traffic at the instance (ENI) level.
+* Stateful: return traffic is automatically allowed, even if no explicit outbound rule exists.
+
+**Key Sub-Concepts**
+
+* **Resource Association:** Can be attached to EC2, RDS, ELB, Lambda in VPC, ElastiCache, Redshift, and other services with ENIs.
+* **Inbound & Outbound Rules:** Specify protocol, port range, and source/destination IP or SG.
+* **Default SG:** Automatically created per VPC; allows all inbound traffic from resources in the same SG and all outbound traffic.
+* **Multiple SGs:** A single ENI/resource can have multiple SGs attached; rules are cumulative.
+
+**Manual Console Creation Steps**
+
+1. **Create Security Group:** VPC → Security Groups → Create Security Group.
+
+   * Name: Provide a name and description.
+   * VPC: Select the VPC.
+2. **Add Inbound Rules:**
+
+   * Protocol, Port Range, Source (IP/CIDR or another SG).
+3. **Add Outbound Rules:**
+
+   * Protocol, Port Range, Destination (IP/CIDR or another SG).
+4. **Associate with Resource:**
+
+   * EC2 → Network & Security → Change Security Groups → Select SG(s).
+
+**Tips / Tricky Points / Gotchas**
+
+* Security Groups are **stateful**; NACLs are stateless.
+* SGs are **per ENI**, not per VPC.
+* **Default SG behavior:** inbound from same SG allowed, outbound all allowed.
+* **Rule evaluation:** All rules are permissive; there is no deny.
+* Best practice: Use **least privilege rules** to minimize exposure.
+
+**Verification Steps**
+
+* Launch an EC2 instance and attach SG.
+* Test connectivity according to inbound/outbound rules (ping, curl, SSH).
+* Confirm access is blocked or allowed as per SG rules.
+
+**Interview-Focused Points**
+
+* Difference between SG (stateful) and NACL (stateless).
+* Default SG behavior in a new VPC.
+* SG association with ENI vs resource.
+* Best practices for securing instances using SGs.
+
+---
+---
+
 
