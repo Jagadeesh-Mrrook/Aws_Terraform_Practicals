@@ -75,7 +75,7 @@ resource "aws_subnet" "tf_private_subnet2" {
   
 }
 
-resource "aws_internet_gateway" "console-igw" {
+resource "aws_internet_gateway" "terraform-igw" {
   vpc_id = aws_vpc.first_vpc.id
 
   tags = {
@@ -93,7 +93,7 @@ resource "aws_route_table" "terraform-public-rt" {
 resource "aws_route" "Public-Internet" {
   route_table_id = aws_route_table.terraform-public-rt.id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id = aws_internet_gateway.console-igw.id 
+  gateway_id = aws_internet_gateway.terraform-igw.id
 }
 
 resource "aws_route_table_association" "rta-public-subnet1" {
@@ -113,12 +113,17 @@ resource "aws_route_table" "terraform-private-rt" {
   }
 }
 
-/*resource "aws_route" "Public-Internet" {
+resource "aws_route" "Public-Internet1" {
   route_table_id = aws_route_table.terraform-public-rt.id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id = aws_internet_gateway.console-igw.id 
-}*/
+  nat_gateway_id = aws_nat_gateway.terraform-nat-gateway1.id
+}
 
+resource "aws_route" "Public-Internet2" {
+  route_table_id = aws_route_table.terraform-public-rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id = aws_nat_gateway.terraform-nat-gateway2.id
+}
 resource "aws_route_table_association" "rta-private-subnet1" {
   subnet_id      = aws_subnet.tf_private_subnet1.id
   route_table_id = aws_route_table.terraform-private-rt.id
@@ -127,4 +132,52 @@ resource "aws_route_table_association" "rta-private-subnet1" {
 resource "aws_route_table_association" "rta-private-subnet2" {
   subnet_id      = aws_subnet.tf_private_subnet2.id
   route_table_id = aws_route_table.terraform-private-rt.id
+}
+
+##Elastic IP-1 for NAT Gateway
+resource "aws_eip" "eip_nat_gateway" {
+  domain = "vpc"
+
+  tags = {
+    Name = "terraform-eip-nat-gateway1"
+  }
+}
+
+#NAT Gateway-1 Creation
+
+resource "aws_nat_gateway" "terraform-nat-gateway1" {
+  allocation_id = aws_eip.eip_nat_gateway.id
+  subnet_id     = aws_subnet.tf_public_subnet1.id
+
+  tags = {
+    Name = "Terraform-nat-gateway-Subnet1"
+  }
+
+  # To ensure proper ordering, it is recommended to add an explicit dependency
+  # on the Internet Gateway for the VPC.
+  depends_on = [aws_internet_gateway.terraform-igw]
+}
+
+##Elastic IP-1 for NAT Gateway
+resource "aws_eip" "eip_nat_gateway2" {
+  domain = "vpc"
+
+  tags = {
+    Name = "terraform-eip-nat-gateway2"
+  }
+}
+
+#NAT Gateway-2 Creation
+
+resource "aws_nat_gateway" "terraform-nat-gateway2" {
+  allocation_id = aws_eip.eip_nat_gateway2.id
+  subnet_id     = aws_subnet.tf_public_subnet2.id
+
+  tags = {
+    Name = "Terraform-nat-gateway-Subnet2"
+  }
+
+  # To ensure proper ordering, it is recommended to add an explicit dependency
+  # on the Internet Gateway for the VPC.
+  depends_on = [aws_internet_gateway.terraform-igw]
 }
