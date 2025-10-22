@@ -235,3 +235,55 @@ resource "aws_security_group_rule" "egress_rule" {
   description       = "Allow all outbound traffic"
 }
 
+
+resource "aws_network_acl" "terraform_nacl" {
+  vpc_id = aws_vpc.first_vpc.id
+
+  tags = {
+    Name = "terraform-nacl"
+  }
+}
+
+resource "aws_network_acl_rule" "ssh_rule_inbound" {
+  network_acl_id = aws_network_acl.terraform_nacl.id
+  rule_number    = 100
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 22
+  to_port        = 22
+}
+
+resource "aws_network_acl_rule" "http_rule_inbound" {
+  network_acl_id = aws_network_acl.terraform_nacl.id
+  rule_number    = 110
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 80
+  to_port        = 80
+}
+
+resource "aws_network_acl_rule" "ssh_rule_outbound" {
+  network_acl_id = aws_network_acl.terraform_nacl.id
+  rule_number    = 100
+  egress         = true
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 22
+  to_port        = 22
+}
+
+resource "aws_network_acl_rule" "http_rule_outbound" {
+  network_acl_id = aws_network_acl.terraform_nacl.id
+  rule_number    = 100
+  egress         = true
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 80
+  to_port        = 80
+}
