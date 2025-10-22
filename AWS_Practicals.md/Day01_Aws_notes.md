@@ -422,4 +422,149 @@ A **subnet** is a range of IP addresses within a VPC that resides in a single **
 ---
 ---
 
+## Network Access Control List (NACL) - AWS Notes
+
+### Concept / What
+
+A **Network ACL (NACL)** is a **subnet-level firewall** in AWS that controls **inbound and outbound traffic**. It is **stateless**, meaning return traffic must be explicitly allowed.
+
+### Why / Purpose / Use Case
+
+* Provides **subnet-level security**.
+* Useful for **controlling traffic for multiple instances** in a subnet.
+* Can be used alongside Security Groups for **defense-in-depth**.
+* Helps meet **compliance requirements** for network isolation.
+
+### How it Works / Steps / Syntax (AWS Console)
+
+1. **Navigate to VPC Dashboard** → Network ACLs → Create Network ACL.
+2. **Configure Basic Settings:**
+
+   * Name tag (e.g., `my-nacl`)
+   * VPC selection
+3. **Inbound Rules:**
+
+   * Add rules with Rule #, Type, Protocol, Port Range, Source, and Action (ALLOW/DENY)
+4. **Outbound Rules:**
+
+   * Add rules with Rule #, Type, Protocol, Port Range, Destination, and Action
+5. **Subnet Association:**
+
+   * Associate the NACL with one or more subnets
+6. **Verification:**
+
+   * Launch EC2 in the subnet
+   * Test allowed ports (SSH, HTTP)
+   * Test blocked ports to ensure DENY works
+
+### Common Issues / Errors
+
+* Traffic blocked unexpectedly due to **first-match rule logic**.
+* Forgetting to allow return traffic for **stateless NACLs**.
+* Trying to reuse **same rule number** → AWS error.
+* Misunderstanding the **default NACL** behavior.
+
+### Troubleshooting / Fixes
+
+* Always check **rule numbers** and evaluation order.
+* Ensure **return traffic** is explicitly allowed.
+* Use different rule numbers (e.g., 100, 110, 120) and leave gaps.
+* Verify subnet association.
+
+### Best Practices / Tips
+
+* Keep NACLs **simple**; use SGs for fine-grained security.
+* Use **first-match logic** carefully; order your rules properly.
+* Default deny (`*`) is always applied for unmatched traffic.
+* Keep one NACL per subnet for clarity.
+* Leave gaps between rule numbers for easy modifications.
+* Remember: **both NACL and SG must allow traffic** for it to pass.
+
+### Special Scenarios / Interview Tips
+
+* **SG vs NACL:** SG = instance-level (stateful), NACL = subnet-level (stateless).
+* **Allow + Deny on same traffic:** First-match wins; DENY takes effect if it’s the first match.
+* **Default behavior:** Custom NACL = deny all, Default AWS NACL = allow all.
+* **Rule number uniqueness:** Cannot have duplicate rule numbers in a NACL.
+* **`*` rule:** Implicit deny for any traffic not matching existing rules.
+
+### Example
+
+| Rule # | Type | Port | Source/Destination | Action          |
+| ------ | ---- | ---- | ------------------ | --------------- |
+| 100    | SSH  | 22   | 0.0.0.0/0          | ALLOW           |
+| 110    | HTTP | 80   | 0.0.0.0/0          | ALLOW           |
+| *      | All  | All  | All                | DENY (implicit) |
+
+---
+---
+
+## VPC Flow Logs
+
+### Concept / What
+
+VPC Flow Logs capture metadata about IP traffic going to and from network interfaces (ENIs) in a VPC, subnet, or specific interface. They log information such as source/destination IPs, ports, protocol, and whether traffic was accepted or rejected. Payloads are not logged.
+
+### Why / Purpose / Use Case
+
+* Troubleshoot connectivity issues (SG/NACL mismatches)
+* Monitor network activity and detect anomalies
+* Audit network traffic for compliance
+* Analyze bandwidth usage and optimize cost
+
+### How it Works / Steps / Syntax (AWS Console)
+
+1. **Navigate to VPC**: AWS Console → VPC → Your VPCs → Select VPC
+2. **Create Flow Log**: Actions → Create flow log
+3. **Define Log Details**:
+
+   * **Filter** (Mandatory): ALL, ACCEPT, REJECT
+   * **Max aggregation interval** (Optional): 1 or 10 minutes
+   * **Destination** (Mandatory): CloudWatch Logs or S3
+   * **IAM Role** (Mandatory if CloudWatch selected): Allows publishing logs
+4. **Select Resource Type**: VPC (recommended), Subnet, or ENI
+5. **Create Flow Log**: Click Create Flow Log
+6. **Verify Logs**:
+
+   * CloudWatch Logs → Log Group → Log Streams
+   * S3 → Bucket path `/AWSLogs/<account-id>/vpcflowlogs/...`
+   * Example log entry:
+
+     ```
+     2 123456789012 eni-12345 10.0.1.10 172.31.0.2 443 51200 6 10 1000 ACCEPT OK
+     ```
+
+### Common Issues / Errors
+
+* No logs appearing → IAM role or destination misconfigured
+* Only ACCEPT logs showing → Filter incorrectly set
+* High volume → Cost can increase
+* S3 empty → Wrong bucket policy/region
+
+### Troubleshooting / Fixes
+
+* Verify IAM role permissions for CloudWatch Logs or S3
+* Ensure bucket policies allow write access
+* Use CloudWatch Logs Insights for quick queries
+* Monitor log volume and adjust aggregation interval if needed
+
+### Best Practices / Tips
+
+* Start with Filter = ALL for complete visibility
+* Use CloudWatch for real-time analysis, S3 for long-term storage
+* Avoid enabling Flow Logs for every ENI unless necessary
+* Set aggregation interval = 1 min for detailed monitoring
+* Partition S3 logs for cost-effective querying with Athena if needed
+
+### DevOps Role (Realistic Interview Answer)
+
+* Responsible for **enabling and managing VPC Flow Logs**, ensuring logs reach CloudWatch or S3
+* Verify IAM permissions and log delivery
+* Set retention policies and monitor for anomalies
+* Analysis of logs (queries, SQL in Athena) was typically handled by **developers or security team**
+* DevOps focused on setup, reliability, and monitoring, not deep data analytics
+
+---
+---
+
 

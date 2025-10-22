@@ -279,7 +279,7 @@ resource "aws_network_acl_rule" "ssh_rule_outbound" {
 
 resource "aws_network_acl_rule" "http_rule_outbound" {
   network_acl_id = aws_network_acl.terraform_nacl.id
-  rule_number    = 100
+  rule_number    = 110
   egress         = true
   protocol       = "tcp"
   rule_action    = "allow"

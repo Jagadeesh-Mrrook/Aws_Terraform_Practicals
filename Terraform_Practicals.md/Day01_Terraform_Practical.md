@@ -396,5 +396,694 @@ resource "aws_route_table_association" "public1" {
 ---
 ---
 
+# 🌩️ Terraform Notes — NAT Gateway & Private Subnet Routing
+
+## **Elastic IP (EIP)**
+
+* NAT Gateway requires an Elastic IP for public internet access.
+
+```hcl
+resource "aws_eip" "nat_eip_1" {
+  vpc = true
+
+  tags = {
+    Name = "nat-eip-1"
+  }
+}
+```
+## **Elastic IP (EIP)**
+
+### **⚠️ Note:**
+
+The old syntax
+
+```hcl
+vpc = true
+```
+
+is **deprecated** in the latest AWS provider versions.
+
+You must now use the new argument:
+
+```hcl
+domain = "vpc"
+```
+
+---
+
+### **✅ Updated Terraform Configuration (New Syntax)**
+
+```hcl
+resource "aws_eip" "nat_eip_1" {
+  domain = "vpc"   # New syntax replacing deprecated 'vpc = true'
+
+  tags = {
+    Name = "nat-eip-1"
+  }
+}
+```
+
+---
+
+### **📘 Explanation**
+
+* `domain = "vpc"` → ensures the Elastic IP is created for **VPC usage** (modern setup).
+* Required when creating a **Public NAT Gateway** or assigning a **static public IP** to an EC2 instance.
+* **Private NAT Gateways** do **not** require an Elastic IP.
+
+---
+
+### **Summary**
+
+* Old: `vpc = true` → ❌ Deprecated
+* New: `domain = "vpc"` → ✅ Use this going forward
+* EIP is required for **Public NAT Gateway**, not for **Private NAT Gateway**.
+
+---
+---
+
+## **NAT Gateway**
+
+* Must be in a **public subnet**.
+* Mandatory fields: `subnet_id`, `allocation_id`
+
+```hcl
+resource "aws_nat_gateway" "nat1" {
+  subnet_id     = aws_subnet.public1.id
+  allocation_id = aws_eip.nat_eip_1.id
+
+  tags = {
+    Name = "nat-gateway-1"
+  }
+}
+```
+
+**Tips:**
+
+* NAT Gateway is AZ-specific.
+* Managed, redundant, and horizontally scaled.
+* Cost: per hour + data processed.
+
+---
+
+## **Private Subnet Route Table**
+
+* Update `0.0.0.0/0` route to NAT Gateway.
+
+```hcl
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat1.id
+  }
+
+  tags = {
+    Name = "private-rt"
+  }
+}
+
+resource "aws_route_table_association" "private1" {
+  subnet_id      = aws_subnet.private1.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private2" {
+  subnet_id      = aws_subnet.private2.id
+  route_table_id = aws_route_table.private.id
+}
+```
+
+**Tip:**
+
+* Use `locals.tf` for NAT Gateway or route table IDs if needed.
+* Terraform handles dependency automatically when referencing `aws_nat_gateway.nat1.id`.
+
+---
+
+## **Multi-AZ NAT Gateway Setup**
+
+* One NAT Gateway per AZ for HA.
+* Private subnet in each AZ must point to the NAT Gateway in its AZ.
+
+```hcl
+# AZ 1
+resource "aws_nat_gateway" "nat_az1" {
+  subnet_id     = aws_subnet.public1.id
+  allocation_id = aws_eip.nat_eip_1.id
+}
+
+resource "aws_route_table" "private_az1" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat_az1.id
+  }
+}
+
+# AZ 2
+resource "aws_nat_gateway" "nat_az2" {
+  subnet_id     = aws_subnet.public2.id
+  allocation_id = aws_eip.nat_eip_2.id
+}
+
+resource "aws_route_table" "private_az2" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat_az2.id
+  }
+}
+```
+
+**Notes:**
+
+* This ensures private subnets in each AZ have independent NAT Gateways.
+* Using NAT Instances for multi-AZ HA is possible but **not recommended** due to manual management.
+
+---
+
+## **Verification Steps**
+
+* Check NAT Gateway is in **Available** state in AWS console.
+* Private subnet EC2 instances can access the internet (`curl http://ifconfig.me`).
+* Public subnet EC2 instances still have direct internet access via IGW.
+* For multi-AZ, verify each private subnet routes through its own AZ NAT Gateway.
+
+# 🌩️ Terraform Notes — Private NAT (Internal Routing Only)
+
+## **Purpose / Why Use Private NAT**
+
+* Provides **internal connectivity** for private subnets without using the public internet.
+* Used in **internal routing between VPCs, AZs, or private subnets**.
+* No public Elastic IP is needed; traffic remains private.
+
+**Use Case:**
+
+* Private subnets require routing through a private NAT for **internal network inspection, VPC-to-VPC traffic, or private services**.
+* Ensures traffic never leaves AWS private network.
+
+---
+
+## **Terraform Implementation (Private NAT Gateway)**
+
+* Deploy a **private NAT Gateway** in a private subnet.
+* Routes for private subnets point to this NAT Gateway for **internal routing**.
+
+```hcl
+resource "aws_nat_gateway" "private_nat" {
+  subnet_id         = aws_subnet.private1.id
+  connectivity_type = "private"   # key argument for Private NAT
+
+  tags = {
+    Name = "private-nat-gateway"
+  }
+}
+
+resource "aws_route" "private_nat_route" {
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "10.0.1.0/24"   # internal subnet/VPC range
+  nat_gateway_id         = aws_nat_gateway.private_nat.id
+}
+```
+
+**Notes / Tips:**
+
+* `connectivity_type = "private"` is mandatory for internal-only NAT Gateways.
+* No Elastic IP is required.
+* Multi-AZ: one private NAT per AZ if routing spans multiple AZs.
+* Can be used as an internal firewall, inspection, or private gateway.
+
+---
+
+## **Verification Steps**
+
+* Launch EC2 in private subnet → test connectivity to other internal subnets or VPCs.
+* Verify route table points internal CIDR through the private NAT Gateway.
+* Ensure NAT Gateway is **Available** in AWS console.
+
+---
+
+## **Key Difference From Public NAT Gateway**
+
+| Feature               | Public NAT Gateway | Private NAT Gateway      |
+| --------------------- | ------------------ | ------------------------ |
+| Subnet                | Public             | Private                  |
+| Connectivity Type     | public             | private                  |
+| Elastic IP / Internet | Required           | Not required             |
+| Outbound Internet     | Yes                | No                       |
+| Use case              | Internet access    | Internal private routing |
+
+
+---
+---
+
+# Terraform Security Group Notes
+
+## Concept / What
+
+**AWS Security Group (SG)** controls inbound and outbound traffic for EC2 and other resources in a VPC. In Terraform, use the `aws_security_group` resource to create SGs and `aws_security_group_rule` to manage rules separately.
+
+## Why / Purpose / Use Case
+
+* Acts as a **virtual firewall** for EC2 or other AWS resources.
+* Used to **allow or restrict traffic** (ports, protocols, sources/destinations).
+* Ensures **secure connectivity** within VPCs and to the internet.
+* Helps in **environment segregation** (dev/prod) using tags and rules.
+
+## How it Works / Steps / Syntax
+
+### 1️⃣ Create Security Group Resource
+
+```hcl
+resource "aws_security_group" "web_sg" {
+  name        = "webserver-sg"
+  description = "Security group for web server"
+  vpc_id      = aws_vpc.main.id
+
+  tags = {
+    Name        = "webserver-sg"
+    Environment = "dev"
+  }
+}
+```
+
+### 2️⃣ Create Separate Ingress Rules
+
+```hcl
+# SSH from office
+resource "aws_security_group_rule" "ssh_ingress" {
+  type              = "ingress"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = ["203.0.113.5/32"]
+  security_group_id = aws_security_group.web_sg.id
+  description       = "Allow SSH from office IP"
+}
+
+# HTTP from anywhere
+resource "aws_security_group_rule" "http_ingress" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.web_sg.id
+  description       = "Allow HTTP from anywhere"
+}
+```
+
+### 3️⃣ Create Separate Egress Rule
+
+```hcl
+resource "aws_security_group_rule" "all_egress" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.web_sg.id
+  description       = "Allow all outbound traffic"
+}
+```
+
+### 4️⃣ Attach SG to EC2
+
+```hcl
+resource "aws_instance" "web" {
+  ami                    = "ami-12345"
+  instance_type          = "t2.micro"
+  subnet_id              = aws_subnet.public.id
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+
+  tags = {
+    Name        = "web-server-instance"
+    Environment = "dev"
+  }
+}
+```
+
+## Common Issues / Errors
+
+* SG recreation occurs if `name` changes.
+* Conflicting rules when mixing inline rules with `aws_security_group_rule`.
+* Forgetting to attach SG to EC2 → rules have no effect.
+* Using `0.0.0.0/0` carelessly → exposes ports publicly.
+
+## Troubleshooting / Fixes
+
+* Use `terraform plan` to verify rule changes.
+* Always reference SG ID in `vpc_security_group_ids` of EC2.
+* For multiple rules, manage each with separate `aws_security_group_rule` resources.
+* Avoid inline rules in SG if using separate rule resources.
+
+## Best Practices / Tips
+
+* Prefer `aws_security_group_rule` over inline ingress/egress.
+* Provide both `name` and `tags.Name` for clarity.
+* Keep rules **minimal and specific** (least privilege).
+* Use descriptive `description` fields for each rule.
+* Test connectivity after apply (ping/SSH/HTTP).
+* Avoid `0.0.0.0/0` for SSH in production.
+
+## Outputs
+
+```hcl
+output "web_sg_id" {
+  value = aws_security_group.web_sg.id
+}
+```
+
+* This ensures you can reference the SG ID in other resources or modules.
+
+---
+---
+
+## Terraform VPC Flow Logs
+
+### Concept / What
+
+Terraform resource `aws_flow_log` allows you to enable VPC Flow Logs for a VPC, Subnet, or ENI. Logs can be sent to CloudWatch Logs or an S3 bucket. Flow Logs capture metadata about network traffic such as source/destination IPs, ports, protocol, and ACCEPT/REJECT actions.
+
+### Why / Purpose / Use Case
+
+* Automate enabling Flow Logs across environments
+* Monitor network activity without manual console setup
+* Maintain compliance and audit logs
+* Integrate with dashboards or alerting systems
+
+### How it Works / Steps / Syntax
+
+#### 1️⃣ CloudWatch Logs Example
+
+##### Step 1: Create CloudWatch Log Group
+
+```hcl
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/vpc/flowlogs"
+  retention_in_days = 30
+}
+```
+
+##### Step 2: Create IAM Role for Flow Logs
+
+```hcl
+resource "aws_iam_role" "flow_logs_role" {
+  name = "flow_logs_role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action    = "sts:AssumeRole"
+        Effect    = "Allow"
+        Principal = { Service = "vpc-flow-logs.amazonaws.com" }
+      }
+    ]
+  })
+}
+```
+
+##### Step 3: Attach IAM Policy
+
+```hcl
+resource "aws_iam_role_policy_attachment" "flow_logs_attach" {
+  role       = aws_iam_role.flow_logs_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonVPCCFlowLogsRole"
+}
+```
+
+##### Step 4: Create VPC Flow Log
+
+```hcl
+resource "aws_flow_log" "vpc_flow_cloudwatch" {
+  log_destination      = aws_cloudwatch_log_group.vpc_flow_logs.arn
+  log_destination_type = "cloud-watch-logs"
+  iam_role_arn         = aws_iam_role.flow_logs_role.arn
+  resource_id          = aws_vpc.first_vpc.id
+  resource_type        = "VPC"
+  traffic_type         = "ALL"
+  max_aggregation_interval = 60
+
+  tags = {
+    Name        = "vpc-flow-log-cloudwatch"
+    Environment = "dev"
+  }
+}
+```
+
+#### 2️⃣ S3 Destination Example
+
+##### Step 1: Create S3 Bucket
+
+```hcl
+resource "aws_s3_bucket" "vpc_flow_logs_bucket" {
+  bucket = "org-vpc-flow-logs"
+  acl    = "private"
+
+  tags = {
+    Name        = "vpc-flow-logs"
+    Environment = "dev"
+  }
+}
+```
+
+##### Step 2: Optional Bucket Policy for Flow Logs
+
+```hcl
+resource "aws_s3_bucket_policy" "flow_logs_policy" {
+  bucket = aws_s3_bucket.vpc_flow_logs_bucket.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = { Service = "vpc-flow-logs.amazonaws.com" }
+        Action = "s3:PutObject"
+        Resource = "${aws_s3_bucket.vpc_flow_logs_bucket.arn}/*"
+      }
+    ]
+  })
+}
+```
+
+##### Step 3: Create VPC Flow Log
+
+```hcl
+resource "aws_flow_log" "vpc_flow_s3" {
+  log_destination      = aws_s3_bucket.vpc_flow_logs_bucket.arn
+  resource_id          = aws_vpc.first_vpc.id
+  resource_type        = "VPC"
+  traffic_type         = "ALL"
+  max_aggregation_interval = 60
+
+  tags = {
+    Name        = "vpc-flow-log-s3"
+    Environment = "dev"
+  }
+}
+```
+
+### Key Points / Tips
+
+* CloudWatch destination requires IAM Role; S3 destination requires proper bucket policy.
+* `tags` are optional but recommended for naming, environment, and cost tracking.
+* Ensure S3 bucket exists before creating the flow log.
+* Use `max_aggregation_interval` 1 min for detailed monitoring; 10 min for lower cost.
+* Terraform automatically links the flow log to the resource via `resource_id`.
+
+### Verification
+
+1. Terraform apply → resource created successfully
+2. AWS Console → VPC → Flow Logs → Confirm Active
+3. CloudWatch Logs → Verify log streams populated (CloudWatch setup)
+4. S3 → Verify log files under correct path (S3 setup)
+
+### DevOps Role (Reference)
+
+* Responsible for enabling and managing Terraform-based Flow Logs
+* Ensure log delivery, IAM permissions, retention policies
+* Analysis of logs is typically handled by developers or security teams
+* Focus on automation, monitoring, and reliability rather than deep SQL analytics
+
+---
+---
+
+## **Terraform Notes — Network ACL (NACL)**
+
+---
+
+### **Resource Names**
+
+* `aws_network_acl`
+* `aws_network_acl_rule`
+* `aws_network_acl_association`
+
+---
+
+### **Purpose / Mapping**
+
+* Network ACLs (NACLs) are **stateless firewalls** at the **subnet level**.
+* They control inbound and outbound traffic based on numbered rules.
+* You must define **both ingress and egress rules** explicitly.
+* Commonly used for an **extra layer of subnet-level security**.
+
+---
+
+### **Mandatory Fields**
+
+| Resource                      | Field                         | Description                               |
+| ----------------------------- | ----------------------------- | ----------------------------------------- |
+| `aws_network_acl`             | `vpc_id`                      | The VPC ID where the NACL is created.     |
+| `aws_network_acl_rule`        | `network_acl_id`              | NACL ID to attach the rule.               |
+|                               | `rule_number`                 | Rule priority (lower = higher priority).  |
+|                               | `protocol`                    | “tcp”, “udp”, “icmp”, or “-1” (all).      |
+|                               | `rule_action`                 | “allow” or “deny”.                        |
+|                               | `egress`                      | `true` for outbound, `false` for inbound. |
+|                               | `cidr_block`                  | Source or destination range.              |
+| `aws_network_acl_association` | `subnet_id`, `network_acl_id` | Associates NACL with a subnet.            |
+
+---
+
+### **Example Terraform Code (Both Ingress & Egress)**
+
+```hcl
+# Create custom NACL
+resource "aws_network_acl" "private_nacl" {
+  vpc_id = aws_vpc.main.id
+  tags = { Name = "private-nacl" }
+}
+
+# Ingress rule — Allow SSH inbound
+resource "aws_network_acl_rule" "allow_ssh_inbound" {
+  network_acl_id = aws_network_acl.private_nacl.id
+  rule_number    = 100
+  egress         = false
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 22
+  to_port        = 22
+}
+
+# Egress rule — Allow SSH outbound (for response traffic)
+resource "aws_network_acl_rule" "allow_ssh_outbound" {
+  network_acl_id = aws_network_acl.private_nacl.id
+  rule_number    = 100
+  egress         = true
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 22
+  to_port        = 22
+}
+
+# Associate NACL with private subnet
+resource "aws_network_acl_association" "private_assoc" {
+  subnet_id      = aws_subnet.private_subnet.id
+  network_acl_id = aws_network_acl.private_nacl.id
+}
+```
+
+---
+
+### **Attaching NACLs to Multiple Subnets**
+
+#### ✅ Same NACL for Public & Private Subnets
+
+Each subnet must have its **own association block**.
+
+```hcl
+# Associate same NACL with Public Subnet
+resource "aws_network_acl_association" "public_assoc" {
+  subnet_id      = aws_subnet.public_subnet.id
+  network_acl_id = aws_network_acl.common_nacl.id
+}
+
+# Associate same NACL with Private Subnet
+resource "aws_network_acl_association" "private_assoc" {
+  subnet_id      = aws_subnet.private_subnet.id
+  network_acl_id = aws_network_acl.common_nacl.id
+}
+```
+
+#### ✅ Dynamic Way (Recommended for Multiple Subnets)
+
+Use `for_each` to loop through multiple subnets:
+
+```hcl
+locals {
+  public_subnets = [
+    aws_subnet.public_subnet_1.id,
+    aws_subnet.public_subnet_2.id,
+    aws_subnet.public_subnet_3.id
+  ]
+}
+
+resource "aws_network_acl_association" "public_assoc" {
+  for_each       = toset(local.public_subnets)
+  subnet_id      = each.value
+  network_acl_id = aws_network_acl.public_nacl.id
+}
+```
+
+✅ Terraform automatically creates one association per subnet.
+
+---
+
+### **Key Rules to Remember**
+
+* A **subnet can have only one NACL** attached.
+* A **single NACL** can be attached to **multiple subnets**.
+* Each subnet must be defined in a **separate association block**.
+* Use `for_each` to dynamically attach NACLs to multiple subnets.
+* NACL and subnet must be in the **same VPC**.
+
+---
+
+### **Tips / Interview Points**
+
+* **Stateless:** Must define both inbound and outbound rules.
+* **Rule Number:** Lower number → higher priority.
+* **Default NACL:** Allows all traffic.
+* **Custom NACL:** Starts with deny-all by default.
+* **Security Group vs NACL:**
+
+  * SG → Stateful (response auto allowed)
+  * NACL → Stateless (explicit outbound needed)
+* **Best Practice:** Use separate NACLs for public and private subnets in production.
+* **Lifecycle Tip:** Use `create_before_destroy = true` when updating rules.
+
+---
+
+### **Verification Steps**
+
+1. Run `terraform apply`.
+2. Go to **AWS Console → VPC → Network ACLs**.
+3. Confirm both **inbound** and **outbound** rules.
+4. Verify correct **subnet associations**.
+5. Launch EC2 in subnet → test SSH or HTTP based on NACL rules.
+
+---
+
+### **Summary Table**
+
+| Concept                 | Explanation                                |
+| ----------------------- | ------------------------------------------ |
+| NACL Type               | Stateless firewall for subnets             |
+| Association             | One NACL per subnet (one block per subnet) |
+| Multi-Subnet Setup      | Use `for_each` for dynamic associations    |
+| Direction               | Define both ingress and egress manually    |
+| Public / Private Subnet | NACLs can be attached to both              |
+| Main Limitation         | NACL + Subnet must belong to same VPC      |
+
+---
+---
+
+
+
 
 
