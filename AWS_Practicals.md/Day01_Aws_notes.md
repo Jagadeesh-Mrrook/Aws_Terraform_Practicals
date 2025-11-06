@@ -567,4 +567,95 @@ VPC Flow Logs capture metadata about IP traffic going to and from network interf
 ---
 ---
 
+# AWS VPC Traffic Flow Notes
+
+Below are the **three types of traffic flows** in a VPC, explained clearly with all components: VPC, Subnet, Route Table, IGW, NAT, ENI, SG, NACL.
+
+---
+
+## 🔵 1. Instance → Instance (Inside Same VPC)
+
+**Flow:** EC2 → ENI → SG (Outbound) → Subnet → NACL (Outbound) → Route Table → Local Route → Other Subnet → NACL (Inbound) → SG (Inbound) → EC2
+
+### 🔹 Steps
+
+* EC2 sends traffic through its **ENI**.
+* **SG outbound** rules decide if it is allowed.
+* Traffic enters the **subnet**.
+* **NACL outbound** checks permission.
+* Traffic hits the **Route Table**.
+* Route Table sees destination is inside VPC CIDR → uses **local**.
+* AWS internal router delivers traffic to the target **subnet**.
+* **NACL inbound** checks permission.
+* Traffic reaches EC2’s **ENI**.
+* **SG inbound** decides if NEW inbound is allowed.
+
+### 🔹 Key Point
+
+**Local route = internal VPC routing.** All subnets can talk inside the VPC.
+
+---
+
+## 🔵 2. Instance → Internet (Outbound)
+
+**Flow (Public Subnet):** EC2 → ENI → SG (Outbound) → Subnet → NACL (Outbound) → Route Table → IGW → Internet
+
+**Flow (Private Subnet):** EC2 → ENI → SG (Outbound) → Subnet → NACL (Outbound) → Route Table → NAT → IGW → Internet
+
+### 🔹 Steps
+
+* EC2 sends traffic → **SG outbound** allows.
+* **NACL outbound** allows.
+* Route Table checks destination:
+
+  * If **0.0.0.0/0 → igw** → public subnet.
+  * If **0.0.0.0/0 → nat-gateway** → private subnet.
+* Traffic goes to IGW or NAT.
+* NAT sends traffic to IGW.
+* IGW sends traffic to the **internet**.
+
+### 🔹 Key Point
+
+**IGW → Both-way internet access.**
+**NAT → Only outbound to internet. No inbound new connections.**
+
+---
+
+## 🔵 3. Internet → Instance (Inbound NEW Connection)
+
+**Flow:** Internet → IGW → Route Table (local) → Subnet → NACL (Inbound) → SG (Inbound) → EC2
+
+### 🔹 Steps
+
+* User on internet hits EC2’s **public IP**.
+* Traffic reaches **IGW**.
+* IGW passes traffic to the **VPC**.
+* **Route Table** checks destination IP (EC2 private IP) → matches **local** route.
+* RT forwards traffic to the correct **subnet**.
+* **NACL inbound** checks permissions.
+* Traffic reaches the EC2’s **ENI**.
+* **SG inbound** checks rules:
+
+  * If allowed → EC2 receives it.
+  * If not → traffic is dropped.
+
+### 🔹 Key Point
+
+Route Table **only routes** traffic.
+Security Group/NACL **allow or deny** traffic.
+
+---
+
+## 🟣 FINAL SUMMARY
+
+* **Route Table = Road (routes traffic both ways, no allow/deny).**
+* **SG = Guard at instance gate (allow/deny new inbound + outbound).**
+* **NACL = Checkpost at subnet boundary (allow/deny inbound + outbound).**
+* **IGW = Main gate of VPC to internet.**
+* **NAT = One-way gate (private subnet outbound only).**
+* **Local = Internal VPC routing alias.**
+
+---
+---
+
 
